@@ -13,11 +13,24 @@ import ApolloCore
 /// when for background sessions.
 open class URLSessionClient: NSObject, URLSessionDelegate, URLSessionTaskDelegate, URLSessionDataDelegate {
   
-  public enum URLSessionClientError: Error {
+  public enum URLSessionClientError: Error, LocalizedError {
     case noHTTPResponse(request: URLRequest?)
     case sessionBecameInvalidWithoutUnderlyingError
     case dataForRequestNotFound(request: URLRequest?)
     case networkError(data: Data, response: HTTPURLResponse?, underlying: Error)
+    
+    public var errorDescription: String? {
+      switch self {
+      case .noHTTPResponse(let request):
+        return "The request did not receive an HTTP response. Request: \(String(describing: request))"
+      case .sessionBecameInvalidWithoutUnderlyingError:
+        return "The URL session became invalid, but no underlying error was returned."
+      case .dataForRequestNotFound(let request):
+        return "URLSessionClient was not able to locate the stored data for request \(String(describing: request))"
+      case .networkError(_, _, let underlyingError):
+        return "A network error occurred: \(underlyingError.localizedDescription)"
+      }
+    }
   }
   
   /// A completion block to be called when the raw task has completed, with the raw information from the session
@@ -44,8 +57,23 @@ open class URLSessionClient: NSObject, URLSessionDelegate, URLSessionTaskDelegat
                               delegateQueue: callbackQueue)
   }
   
-  deinit {
-    self.clearAllTasks()
+  /// Cleans up and invalidates everything related to this session client.
+  ///
+  /// NOTE: This must be called from the `deinit` of anything holding onto this client in order to break a retain cycle with the delegate.
+  public func invalidate() {
+    func cleanup() {
+      self.session = nil
+      self.clearAllTasks()
+    }
+
+    guard let session = self.session else {
+      // Session's already gone, just cleanup.
+      cleanup()
+      return
+    }
+
+    session.invalidateAndCancel()
+    cleanup()
   }
   
   /// Clears underlying dictionaries of any data related to a particular task identifier.
@@ -59,6 +87,11 @@ open class URLSessionClient: NSObject, URLSessionDelegate, URLSessionTaskDelegat
   ///
   /// Mostly useful for cleanup and/or after invalidation of the `URLSession`.
   open func clearAllTasks() {
+    guard self.tasks.value.apollo.isNotEmpty else {
+      // Nothing to clear
+      return
+    }
+    
     self.tasks.mutate { $0.removeAll() }
   }
   

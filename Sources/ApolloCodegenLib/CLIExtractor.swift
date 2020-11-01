@@ -25,7 +25,7 @@ struct CLIExtractor {
     }
   }
   
-  static let expectedSHASUM = "060d893aea4ebc2effa74b20433f5d0f586b31fec0d0f73c210ee152c032185e"
+  static let expectedSHASUM = "d8ff4cd914708479317354721dee8b156acebddb79abbdcda4348a341ab6e53d"
   
   /// Checks to see if the CLI has already been extracted and is the correct version, and extracts or re-extracts as necessary
   ///
@@ -78,6 +78,22 @@ struct CLIExtractor {
     return true
   }
   
+  static func validateSHASUMOfDownloadedFile(in cliFolderURL: URL, expected: String = CLIExtractor.expectedSHASUM) throws -> Bool {
+    let zipFileURL = ApolloFilePathHelper.zipFileURL(fromCLIFolder: cliFolderURL)
+    
+    do {
+      try self.validateZipFileSHASUM(at: zipFileURL)
+      return true
+    } catch {
+      switch error {
+      case CLIExtractorError.zipFileHasInvalidSHASUM:
+        return false
+      default:
+        throw error
+      }
+    }
+  }
+  
   /// Writes the SHASUM of the extracted version of the CLI to a file for faster checks to ensure we have the correct version.
   ///
   /// - Parameter apolloFolderURL: The URL to the extracted apollo folder.
@@ -119,7 +135,7 @@ struct CLIExtractor {
   /// - Parameter expected: The expected SHASUM. Defaults to the real expected SHASUM. This parameter exists mostly for testing.
   static func validateZipFileSHASUM(at zipFileURL: URL, expected: String = CLIExtractor.expectedSHASUM) throws {
     let shasum = try FileManager.default.apollo.shasum(at: zipFileURL)
-    print("SHASUM: \(shasum)")
+    print("SHASUM of downloaded file: \(shasum)")
     guard shasum == expected else {
       throw CLIExtractorError.zipFileHasInvalidSHASUM(expectedSHASUM: expected, gotSHASUM: shasum)
     }

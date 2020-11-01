@@ -21,13 +21,13 @@ public protocol RequestBodyCreator {
 // MARK: - Default Implementation
 
 extension RequestBodyCreator {
-  
+
   public func requestBody<Operation: GraphQLOperation>(for operation: Operation,
                                                        sendOperationIdentifiers: Bool,
                                                        sendQueryDocument: Bool,
                                                        autoPersistQuery: Bool) -> GraphQLMap {
     var body: GraphQLMap = [
-      "variables": operation.variables,
+      "variables": operation.variables?.withNilValuesRemoved,
       "operationName": operation.operationName,
     ]
 
